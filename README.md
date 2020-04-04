@@ -1,2 +1,2 @@
 # Models-GitHub
- AMPL models for diferents mathematical problems in electrical distribution systems
+ AMPL mathematical models for different problems in electrical power distribution systems
