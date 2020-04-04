@@ -1,0 +1,60 @@
+if ( ex == 0) then {
+  let ex := 1;
+  let VMAX := VMAX * vb;
+  let VMIN := VMIN * vb;
+  let VFK := (1/tj) * (1-(1/((1+tj)^K))); 
+  let CLOSS := VFK * LF ;
+  let C_VARSE := VFK * LF* cs;
+  # let bmax := VMAX^2 - VMIN^2;
+  for{a in A} {
+    let RT[a]  := RT[a]/1000;
+    let XT[a]  := XT[a]/1000;
+    let ZT2[a] := RT[a]^2 + XT[a]^2;
+    let IT[a]  := IT[a] * r3;
+  };
+  for{n in N} {
+    # let Pd[n] := Sd[n] * pf;
+    # let Qd[n] := Sd[n] * sin( acos(pf) );
+  }
+  for{(l,n,m) in L} {
+    for{a in A} {
+      if(a < TO[l,n,m]) then
+        fix z[l,n,m,a] := 0;
+      if( a == TO[l,n,m]) then {
+        let custo[l,n,m,a] := 0;
+      }
+      else {
+        let custo[l,n,m,a] := CFT[a];
+      }
+    }
+  };
+
+};
+
+for{n in N, t in T} {
+  let V2[t,n] := vb^2;
+  fix Pg[t,n] := 0;
+  fix Qg[t,n] := 0;
+  let vini[n,t] :=  ( VMAX + VMIN ) / 2;
+};
+
+for{n in NSE, t in T} {
+  fix V2[t,n] := VMAX^2;
+  unfix Pg[t,n] := 0;
+  unfix Qg[t,n] := 0;
+};
+
+
+  
+let DS := VMAX * (max{a in A} IT[a]) / PWmax;
+for {p in PW}
+  let mS[p] := ( 2 * p - 1 ) * DS;
+let mS[1] := mS[1] * 5/6;
+
+for {n in NSE} {
+  let DG[n] := ( Sgo[n] + Sgp[n] ) / PWmax;
+
+  for {p in PW}
+    let mG[n,p] := ( 2 * p - 1 ) * DG[n];
+  let mG[n,1] := mG[n,1] * 5/6;
+};

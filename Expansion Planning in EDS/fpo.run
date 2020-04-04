@@ -1,0 +1,135 @@
+reset;
+option solver cplex1263;
+option cplex_options "time=400000 threads=4 nodefile=2 workfilelim=1200 \
+                      workfiledir=C:\ampl mipdisplay=4  \
+                      mipinterval=1000 parallelmode=-1";
+
+                     # absmipgap=0 integrality=0                      \
+                     # feasibility=1.0e-09 optimality=1.0e-09         \
+
+model fpo.mod;
+
+# data fpo_sp16n_aleja.dat;
+data fpo_sp24n_aleja.dat;
+# data fpo_sp54n_fredy.dat;
+# data fpo_sp54n_marina.dat;
+
+data fpo.dat;
+
+# expand >PSD.lp;
+
+
+option  relax_integrality 1;
+solve COST;
+for{n in N, t in T}
+  let vini[n,t] := sqrt(V2[t,n]);
+option  relax_integrality 0;
+
+  
+option cplex_options "time=200 threads=4 nodefile=2 workfilelim=1200 \
+                      workfiledir=C:\ampl mipdisplay=4  \
+                      mipinterval=1000 parallelmode=-1 mipgap=0.01 ";
+
+for{k in 1..2} {
+  solve COST;
+  
+  option cplex_options "time=1800 threads=4 nodefile=2 workfilelim=1200 \
+                        workfiledir=C:\ampl mipdisplay=4  \
+                        mipinterval=1000 parallelmode=-1 mipgap=0.0001 ";
+
+  for{n in N, t in T}
+    let vini[n,t] := sqrt(V2[t,n]);
+  
+  printf "\nCOST\t%0.2f\n", COST;
+  printf "CSE\t%0.2f\n", CSE * C_VARSE;
+  printf "CF_se\t%0.2f\n", CF_se;
+  printf "CF_lin\t%0.2f\n", CF_lin;
+  printf "LOSSES\t%0.2f\n", LOSS;
+  printf "CLOSSES\t%0.2f\n", CLOSS * LOSS;
+  
+  printf "\nLOSSES\t%0.2f\n", LOSS;
+  printf "LOSSESc\t%0.2f\n", sum{(l,m,n) in L, a in A, t in T} dT[t] * cese[t] * ( P[t,l,m,n,a]^2 + Q[t,l,m,n,a]^2 ) / V2[t,n] * RT[a] * D[l,m,n];
+  printf "e\%\t%0.2f\n\n\n", (LOSS / (sum{(l,m,n) in L, a in A, t in T} dT[t] * cese[t]* ( P[t,l,m,n,a]^2 + Q[t,l,m,n,a]^2 ) / V2[t,n] * RT[a] * D[l,m,n]) - 1) * 100;
+  
+}
+
+
+
+for{t in T} {
+  printf "\n\nLOAD LEVEL\t%d\n", t;
+  printf "\nLOSSES\t%0.2f\n", sum{(l,m,n) in L, a in A} I2[t,l,m,n,a] * RT[a] * D[l,m,n];
+  printf "LOSSESc\t%0.2f\n", sum{(l,m,n) in L, a in A} ( P[t,l,m,n,a]^2 + Q[t,l,m,n,a]^2 ) / V2[t,n] * RT[a] * D[l,m,n];
+  printf "e\%\t%0.2f\n\n\n", ( (sum{(l,m,n) in L, a in A} I2[t,l,m,n,a] * RT[a] * D[l,m,n]) / (sum{(l,m,n) in L, a in A} ( P[t,l,m,n,a]^2 + Q[t,l,m,n,a]^2 ) / V2[t,n] * RT[a] * D[l,m,n]) - 1) * 100;
+  printf "\nl\tm\tn\tVm\tVn\tPmn\tQmn\tImn\n";
+  for {(l,m,n) in L} {
+    if( yp[l,m,n] + yn[l,m,n] == 1 ) then {
+      printf "%d\t%d\t%d\t%0.4f\t%0.4f\t%0.2f\t%0.2f\t%0.2f\t%0.2f\n",
+              l , m, n,
+              sqrt( V2[t,m] ) / vb, sqrt( V2[t,n] ) /vb,
+              sum{a in A} P[t,l,m,n,a], sum{a in A} Q[t,l,m,n,a],
+              sum{a in A} sqrt(I2[t,l,m,n,a]) / r3,
+              ( sum{a in A} sqrt((I2[t,l,m,n,a]+ 1e-04) / (Ps[t,l,m,n]^2 + Qs[t,l,m,n]^2+ 1e-04) * V2[t,n]) - 1) * 100;
+    }
+  }
+  printf "\nTensoes\n";
+  for{n in N}
+    printf "%d\t%10.6f\n", n, sqrt( V2[t,n] ) /vb;
+
+  let volmin := min {n in N} V2[t,n];
+  printf "\nvmin barra %d\t%10.4f\n", min {n in N: V2[t,n] == volmin} n, sqrt( volmin ) / vb;
+
+  printf "\nbarra\tPgd\tQgd\tSg\n";
+  for{n in NSE}
+    printf "%d\t%0.2f\t%0.2f\t%0.2f\n",n, Pg[t,n], Qg[t,n], sqrt(Sg2[t,n]);
+  
+ 
+ 
+  display bmax;
+  let xbmax := max {(l,m,n) in L} abs(b[t,l,m,n]);
+  printf "bmax linha %d\t%10.4f\n", max {(l,m,n) in L: abs(b[t,l,m,n]) == xbmax} l, xbmax;
+
+}
+
+printf "\nlinha\ti\tj\t R\t        X\t\ttype\n";
+for {(l,m,n) in L} {
+ if( yp[l,m,n] + yn[l,m,n] == 1 ) then
+    printf "%d\t%d\t%d\t%0.6f\t%15.6f\t%d\n",
+            l, m, n,
+            D[l,m,n] * sum{a in A} RT[a] * z[l,m,n,a] * 1000,
+            D[l,m,n] * sum{a in A} XT[a] * z[l,m,n,a] * 1000,
+            sum{a in A} a * z[l,m,n,a];
+}
+printf "\nlinhas desligadas\n";
+for {(l,m,n) in L: yp[l,m,n] + yn[l,m,n] == 0} {
+  let volmin := max {t in T} abs(b[t,l,m,n]);
+  for{t in T} {
+    if(volmin == abs(b[t,l,m,n])) then
+      printf "%d\t%d\t%d\t(%d)\t%0.4f\n", l, m, n, t, b[t,l,m,n];
+  }
+}
+
+let volmin := max {(l,m,n) in L, t in T} abs(b[t,l,m,n]);
+for {(l,m,n) in L, t in T} {
+  if(volmin == abs(b[t,l,m,n])) then
+    printf "\n\nbmax\t%d\t%d\t%d\t%d\t%10.4f\n", t, l, m, n, b[t,l,m,n];
+}
+
+let volmin := min {n in N, t in T} V2[t,n];
+for{n in N, t in T}
+  if(V2[t,n] == volmin) then
+    printf "\nvmin barra-nivel\t%d\t%d\t%10.4f\n", n, t, sqrt( volmin ) / vb;
+
+printf "\nCOST\t%0.2f\n", COST;
+printf "CSE\t%0.2f\n", CSE * C_VARSE;
+printf "CF_se\t%0.2f\n", CF_se;
+printf "CF_lin\t%0.2f\n", CF_lin;
+printf "LOSSES\t%0.2f\n", LOSS;
+printf "CLOSSES\t%0.2f\n", CLOSS * LOSS;
+
+printf "\nLOSSES\t%0.2f\n", LOSS;
+printf "LOSSESc\t%0.2f\n", sum{(l,m,n) in L, a in A, t in T} dT[t] * cese[t]* ( P[t,l,m,n,a]^2 + Q[t,l,m,n,a]^2 ) / V2[t,n] * RT[a] * D[l,m,n];
+printf "e\%\t%0.2f\n\n\n", (LOSS / (sum{(l,m,n) in L, a in A, t in T} dT[t] * cese[t]* ( P[t,l,m,n,a]^2 + Q[t,l,m,n,a]^2 ) / V2[t,n] * RT[a] * D[l,m,n]) - 1) * 100;
+# printf "LOSSES_c\t%0.2f\n", sum{(l,m,n) in L, a in A} ( Ps[t,l,m,n]^2 + Qs[t,l,m,n]^2 ) / V2[t,n] * RT[a] * z[l,m,n,a] * D[l,m,n];
+
+printf "Elapsed time:%10.2fs\n\n", _total_solve_user_time;
+printf "Elapsed time:%10.2fs\n\n", _total_solve_elapsed_time;
